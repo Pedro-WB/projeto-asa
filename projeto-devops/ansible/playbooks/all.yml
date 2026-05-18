@@ -1,0 +1,143 @@
+---
+- name: Configurações comuns para todas as VMs
+  hosts: all
+  become: yes
+  vars:
+    users:
+      - pedro
+      - barbosa
+    
+  tasks:
+    - name: Atualizar cache apt e sistema (update e upgrade)
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600
+
+    - name: Instalar chrony (NTP)
+      apt:
+        name: chrony
+        state: present
+
+    - name: Configurar servidor NTP para pool.ntp.br
+      lineinfile:
+        path: /etc/chrony/chrony.conf
+        regexp: '^pool'
+        line: 'pool pool.ntp.br iburst'
+      notify: restart chrony
+
+    - name: Iniciar e habilitar chrony
+      service:
+        name: chrony
+        state: started
+        enabled: yes
+
+    - name: Ajustar timezone para America/Recife
+      timezone:
+        name: America/Recife
+
+    - name: Criar grupo ifpb
+      group:
+        name: ifpb
+        state: present
+
+    - name: Criar usuários com login igual ao primeiro nome
+      user:
+        name: "{{ item }}"
+        groups: ifpb
+        shell: /bin/bash
+        create_home: yes
+        state: present
+      loop: "{{ users }}"
+
+    - name: Permitir sudo para grupo ifpb (acesso root)
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        regexp: '^%ifpb'
+        line: '%ifpb ALL=(ALL:ALL) ALL'
+        validate: 'visudo -cf %s'
+
+    - name: Criar diretório .ssh para cada usuário
+      file:
+        path: "/home/{{ item }}/.ssh"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        mode: '0700'
+      loop: "{{ users }}"
+
+    - name: Gerar chave SSH para cada usuário
+      openssh_keypair:
+        path: "/home/{{ item }}/.ssh/id_rsa"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+        type: rsa
+        size: 2048
+      loop: "{{ users }}"
+
+    - name: Configurar authorized_keys para cada usuário
+      shell: |
+        cat /home/{{ item }}/.ssh/id_rsa.pub >> /home/{{ item }}/.ssh/authorized_keys
+        chmod 600 /home/{{ item }}/.ssh/authorized_keys
+        chown {{ item }}:{{ item }} /home/{{ item }}/.ssh/authorized_keys
+      loop: "{{ users }}"
+
+    - name: Criar banner SSH
+      copy:
+        dest: /etc/ssh/banner
+        content: "Acesso apenas para pessoas com autorização expressa!!!\n"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Configurar SSH - Permitir apenas autenticação por chaves públicas
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: restart sshd
+
+    - name: Configurar SSH - Habilitar PubkeyAuthentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PubkeyAuthentication'
+        line: 'PubkeyAuthentication yes'
+      notify: restart sshd
+
+    - name: Configurar SSH - Bloquear acesso root
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: restart sshd
+
+    - name: Configurar SSH - Permitir apenas grupos vagrant e ifpb
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?AllowGroups'
+        line: 'AllowGroups vagrant ifpb'
+      notify: restart sshd
+
+    - name: Configurar SSH - Banner de saudação
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner'
+        line: 'Banner /etc/ssh/banner'
+      notify: restart sshd
+
+    - name: Instalar cliente NFS
+      apt:
+        name: nfs-common
+        state: present
+
+  handlers:
+    - name: restart chrony
+      service:
+        name: chrony
+        state: restarted
+
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
