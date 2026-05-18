@@ -56,27 +56,26 @@ Desenvolvimento de competências práticas em DevOps e Infraestrutura como Códi
 - Montagem automática NFS em /var/nfs via autofs
 
 ## Estrutura do Projeto
-
 projeto-devops/
 ├── README.md
 ├── Vagrantfile
 └── ansible/
-├── ansible.cfg
-├── inventory/
-│ └── hosts.yml
-└── playbooks/
-├── all.yml
-├── arq.yml
-├── db.yml
-├── app.yml
-├── cli.yml
-└── templates/
-├── dhcpd.conf.j2
-├── named.conf.options.j2
-├── named.conf.local.j2
-├── db.dominio.j2
-├── db.reverso.j2
-└── exports.j2
+    ├── ansible.cfg
+    ├── inventory/
+    │   └── hosts.yml
+    └── playbooks/
+        ├── all.yml
+        ├── arq.yml
+        ├── db.yml
+        ├── app.yml
+        ├── cli.yml
+        └── templates/
+            ├── dhcpd.conf.j2
+            ├── named.conf.options.j2
+            ├── named.conf.local.j2
+            ├── db.dominio.j2
+            ├── db.reverso.j2
+            └── exports.j2
 
 ## Como Executar
 
