@@ -1,0 +1,99 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  # General Vagrant VM configuration.
+  config.vm.box = "debian/bookworm64"
+  config.ssh.insert_key = false
+  
+  if Vagrant.has_plugin?("vagrant-vbguest")
+    config.vbguest.auto_update = false
+  end
+  
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  
+  config.vm.provider :virtualbox do |v|
+    v.memory = 512
+    v.linked_clone = true
+    v.check_guest_additions = false
+  end
+  
+  config.trigger.before :"Vagrant::Action::Builtin::WaitForCommunicator", type: :action do |t|
+    t.warn = "Interrompe o servidor dhcp do virtualbox"
+    t.run = {inline: "vboxmanage dhcpserver stop --interface vboxnet0"}
+  end
+  
+  # File server.
+  config.vm.define "arq" do |arq|
+    arq.vm.hostname = "arq.pedro.barbosa.devops"
+    arq.vm.network :private_network, ip: "192.168.56.20"
+    
+    # 3 discos adicionais de 10GB
+    (0..2).each do |x|
+      arq.vm.disk :disk, size: "10GB", name: "disk-#{x}"
+    end
+    
+    arq.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/all.yml"
+    end
+    
+    arq.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/arq.yml"
+    end
+  end
+  
+  # Database server.
+  config.vm.define "db" do |db|
+    db.vm.hostname = "db.pedro.barbosa.devops"
+    db.vm.network :private_network, mac: "080027AABB01", type: "dhcp"
+    
+    db.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/all.yml"
+    end
+    
+    db.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/db.yml"
+    end
+  end
+  
+  # Application server.
+  config.vm.define "app" do |app|
+    app.vm.hostname = "app.pedro.barbosa.devops"
+    app.vm.network :private_network, mac: "080027AABB02", type: "dhcp"
+    
+    app.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/all.yml"
+    end
+    
+    app.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/app.yml"
+    end
+  end
+  
+  # Client.
+  config.vm.define "cli" do |cli|
+    cli.vm.hostname = "cli.pedro.barbosa.devops"
+    cli.vm.network :private_network, type: "dhcp"
+    
+    cli.vm.provider :virtualbox do |v|
+      v.memory = 1024
+    end
+    
+    cli.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/all.yml"
+    end
+    
+    cli.vm.provision "ansible" do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "ansible/playbooks/cli.yml"
+    end
+  end
+  
+end
