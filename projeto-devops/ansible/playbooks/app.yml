@@ -1,0 +1,106 @@
+---
+- name: Configuração específica do Servidor de Aplicação
+  hosts: app
+  become: yes
+  
+  tasks:
+    - name: Instalar apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Criar index.html personalizado
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+              <meta charset="UTF-8">
+              <title>Projeto DevOps - Vagrant e Ansible</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background: #f0f0f0; }
+                  .container { background: white; padding: 30px; border-radius: 10px; max-width: 800px; margin: 0 auto; }
+                  h1 { color: #2c3e50; }
+                  .info { background: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Projeto 01 - DevOps com Vagrant e Ansible</h1>
+                  <div class="info">
+                      <h2>Infraestrutura como Código (IaC)</h2>
+                      <p>Projeto de provisionamento automatizado utilizando Vagrant e Ansible para configurar servidores DHCP, DNS, NFS, LVM, Apache e MariaDB.</p>
+                      <h3>Infraestrutura:</h3>
+                      <ul>
+                          <li>Servidor de Arquivos (arq) - DHCP, DNS, NFS, LVM</li>
+                          <li>Servidor de Banco de Dados (db) - MariaDB</li>
+                          <li>Servidor de Aplicação (app) - Apache2</li>
+                          <li>Cliente (cli) - Firefox</li>
+                      </ul>
+                  </div>
+                  <div class="info">
+                      <h3>Integrante:</h3>
+                      <p><strong>Nome:</strong> Pedro Weverton Barbosa</p>
+                      <p><strong>Matrícula:</strong> 20222380020</p>
+                      <p><strong>Disciplina:</strong> Administração de Sistemas Abertos</p>
+                      <p><strong>Professor:</strong> Leonidas Lima</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      notify: restart apache2
+
+    - name: Iniciar e habilitar Apache2
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    - name: Instalar autofs
+      apt:
+        name: autofs
+        state: present
+
+    - name: Configurar auto.master
+      lineinfile:
+        path: /etc/auto.master
+        line: '/var/nfs /etc/auto.nfs --timeout=60'
+        create: yes
+
+    - name: Configurar auto.nfs
+      copy:
+        dest: /etc/auto.nfs
+        content: 'nfs -rw,soft,intr 192.168.56.20:/dados/nfs'
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart autofs
+
+    - name: Criar diretório /var/nfs
+      file:
+        path: /var/nfs
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Iniciar e habilitar autofs
+      service:
+        name: autofs
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart apache2
+      service:
+        name: apache2
+        state: restarted
+
+    - name: restart autofs
+      service:
+        name: autofs
+        state: restarted
