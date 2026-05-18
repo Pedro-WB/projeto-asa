@@ -1,0 +1,81 @@
+---
+- name: Configuração específica do Cliente
+  hosts: cli
+  become: yes
+  
+  tasks:
+    - name: Instalar firefox-esr
+      apt:
+        name: firefox-esr
+        state: present
+
+    - name: Instalar xauth
+      apt:
+        name: xauth
+        state: present
+
+    - name: Configurar SSH para X11 Forwarding
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11Forwarding'
+        line: 'X11Forwarding yes'
+      notify: restart sshd
+
+    - name: Configurar X11 Display Offset
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11DisplayOffset'
+        line: 'X11DisplayOffset 10'
+      notify: restart sshd
+
+    - name: Configurar X11 UseLocalhost
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11UseLocalhost'
+        line: 'X11UseLocalhost yes'
+      notify: restart sshd
+
+    - name: Instalar autofs
+      apt:
+        name: autofs
+        state: present
+
+    - name: Configurar auto.master
+      lineinfile:
+        path: /etc/auto.master
+        line: '/var/nfs /etc/auto.nfs --timeout=60'
+        create: yes
+
+    - name: Configurar auto.nfs
+      copy:
+        dest: /etc/auto.nfs
+        content: 'nfs -rw,soft,intr 192.168.56.20:/dados/nfs'
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart autofs
+
+    - name: Criar diretório /var/nfs
+      file:
+        path: /var/nfs
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Iniciar e habilitar autofs
+      service:
+        name: autofs
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
+
+    - name: restart autofs
+      service:
+        name: autofs
+        state: restarted
