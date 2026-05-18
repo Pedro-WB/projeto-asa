@@ -89,7 +89,7 @@ projeto-devops/
 
 ```bash
 # Clonar repositório
-git clone <url-do-repositorio>
+git clone https://github.com/Pedro-WB/projeto-asa.git
 cd projeto-devops
 
 # Iniciar todas as VMs (provisionamento automático)
