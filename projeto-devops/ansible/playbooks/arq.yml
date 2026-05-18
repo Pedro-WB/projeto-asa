@@ -1,0 +1,192 @@
+---
+- name: Configuração específica do Servidor de Arquivos
+  hosts: arq
+  become: yes
+  
+  tasks:
+    # ========== DHCP ==========
+    - name: Instalar servidor DHCP
+      apt:
+        name: isc-dhcp-server
+        state: present
+
+    - name: Configurar interface DHCP
+      lineinfile:
+        path: /etc/default/isc-dhcp-server
+        regexp: '^INTERFACESv4='
+        line: 'INTERFACESv4="eth1"'
+
+    - name: Configurar dhcpd.conf
+      template:
+        src: templates/dhcpd.conf.j2
+        dest: /etc/dhcp/dhcpd.conf
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart dhcp
+
+    - name: Iniciar e habilitar DHCP
+      service:
+        name: isc-dhcp-server
+        state: started
+        enabled: yes
+
+    # ========== DNS ==========
+    - name: Instalar bind9
+      apt:
+        name: bind9
+        state: present
+
+    - name: Configurar named.conf.options
+      template:
+        src: templates/named.conf.options.j2
+        dest: /etc/bind/named.conf.options
+        owner: root
+        group: bind
+        mode: '0644'
+      notify: restart bind9
+
+    - name: Configurar named.conf.local
+      template:
+        src: templates/named.conf.local.j2
+        dest: /etc/bind/named.conf.local
+        owner: root
+        group: bind
+        mode: '0644'
+      notify: restart bind9
+
+    - name: Criar zona direta
+      template:
+        src: templates/db.dominio.j2
+        dest: /etc/bind/db.pedro.barbosa.devops
+        owner: root
+        group: bind
+        mode: '0644'
+      notify: restart bind9
+
+    - name: Criar zona reversa
+      template:
+        src: templates/db.reverso.j2
+        dest: /etc/bind/db.192.168.56
+        owner: root
+        group: bind
+        mode: '0644'
+      notify: restart bind9
+
+    - name: Iniciar e habilitar bind9
+      service:
+        name: bind9
+        state: started
+        enabled: yes
+
+    # ========== LVM ==========
+    - name: Instalar LVM2
+      apt:
+        name: lvm2
+        state: present
+
+    - name: Aguardar discos ficarem disponíveis
+      wait_for:
+        path: /dev/sdb
+        timeout: 30
+
+    - name: Criar Physical Volumes nos 3 discos
+      pvcreate:
+        devices: 
+          - /dev/sdb
+          - /dev/sdc
+          - /dev/sdd
+
+    - name: Criar Volume Group dados
+      vgcreate:
+        vg: dados
+        pvs: /dev/sdb,/dev/sdc,/dev/sdd
+
+    - name: Criar Logical Volume ifpb com 15GB
+      lvcreate:
+        vg: dados
+        lv: ifpb
+        size: 15G
+
+    - name: Formatar LV ifpb com ext4
+      filesystem:
+        fstype: ext4
+        dev: /dev/dados/ifpb
+
+    - name: Criar diretório /dados
+      file:
+        path: /dados
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Configurar montagem automática no /etc/fstab
+      mount:
+        path: /dados
+        src: /dev/dados/ifpb
+        fstype: ext4
+        state: mounted
+        fstab: /etc/fstab
+
+    # ========== NFS ==========
+    - name: Instalar servidor NFS
+      apt:
+        name: nfs-kernel-server
+        state: present
+
+    - name: Criar usuário nfs-ifpb sem shell
+      user:
+        name: nfs-ifpb
+        shell: /usr/sbin/nologin
+        create_home: no
+        state: present
+
+    - name: Obter UID e GID do nfs-ifpb
+      getent:
+        database: passwd
+        key: nfs-ifpb
+        split: ':'
+
+    - name: Criar diretório /dados/nfs
+      file:
+        path: /dados/nfs
+        state: directory
+        owner: nfs-ifpb
+        group: nfs-ifpb
+        mode: '0755'
+
+    - name: Configurar exports do NFS
+      template:
+        src: templates/exports.j2
+        dest: /etc/exports
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart nfs
+
+    - name: Aplicar exports
+      command: exportfs -a
+      notify: restart nfs
+
+    - name: Iniciar e habilitar NFS
+      service:
+        name: nfs-kernel-server
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart dhcp
+      service:
+        name: isc-dhcp-server
+        state: restarted
+
+    - name: restart bind9
+      service:
+        name: bind9
+        state: restarted
+
+    - name: restart nfs
+      service:
+        name: nfs-kernel-server
+        state: restarted
