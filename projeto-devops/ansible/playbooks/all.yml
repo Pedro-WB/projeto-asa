@@ -2,11 +2,7 @@
 - name: Configurações comuns para todas as VMs
   hosts: all
   become: yes
-  vars:
-    users:
-      - pedro
-      - barbosa
-    
+  
   tasks:
     - name: Atualizar cache apt e sistema (update e upgrade)
       apt:
@@ -41,14 +37,21 @@
         name: ifpb
         state: present
 
-    - name: Criar usuários com login igual ao primeiro nome
+    - name: Criar usuário pedro
       user:
-        name: "{{ item }}"
+        name: pedro
         groups: ifpb
         shell: /bin/bash
         create_home: yes
         state: present
-      loop: "{{ users }}"
+
+    - name: Criar usuário barbosa
+      user:
+        name: barbosa
+        groups: ifpb
+        shell: /bin/bash
+        create_home: yes
+        state: present
 
     - name: Permitir sudo para grupo ifpb (acesso root)
       lineinfile:
@@ -58,30 +61,49 @@
         line: '%ifpb ALL=(ALL:ALL) ALL'
         validate: 'visudo -cf %s'
 
-    - name: Criar diretório .ssh para cada usuário
+    - name: Criar diretório .ssh para pedro
       file:
-        path: "/home/{{ item }}/.ssh"
+        path: /home/pedro/.ssh
         state: directory
-        owner: "{{ item }}"
-        group: "{{ item }}"
+        owner: pedro
+        group: pedro
         mode: '0700'
-      loop: "{{ users }}"
 
-    - name: Gerar chave SSH para cada usuário
+    - name: Criar diretório .ssh para barbosa
+      file:
+        path: /home/barbosa/.ssh
+        state: directory
+        owner: barbosa
+        group: barbosa
+        mode: '0700'
+
+    - name: Gerar chave SSH para pedro
       openssh_keypair:
-        path: "/home/{{ item }}/.ssh/id_rsa"
-        owner: "{{ item }}"
-        group: "{{ item }}"
+        path: /home/pedro/.ssh/id_rsa
+        owner: pedro
+        group: pedro
         type: rsa
         size: 2048
-      loop: "{{ users }}"
 
-    - name: Configurar authorized_keys para cada usuário
+    - name: Gerar chave SSH para barbosa
+      openssh_keypair:
+        path: /home/barbosa/.ssh/id_rsa
+        owner: barbosa
+        group: barbosa
+        type: rsa
+        size: 2048
+
+    - name: Configurar authorized_keys para pedro
       shell: |
-        cat /home/{{ item }}/.ssh/id_rsa.pub >> /home/{{ item }}/.ssh/authorized_keys
-        chmod 600 /home/{{ item }}/.ssh/authorized_keys
-        chown {{ item }}:{{ item }} /home/{{ item }}/.ssh/authorized_keys
-      loop: "{{ users }}"
+        cat /home/pedro/.ssh/id_rsa.pub >> /home/pedro/.ssh/authorized_keys
+        chmod 600 /home/pedro/.ssh/authorized_keys
+        chown pedro:pedro /home/pedro/.ssh/authorized_keys
+
+    - name: Configurar authorized_keys para barbosa
+      shell: |
+        cat /home/barbosa/.ssh/id_rsa.pub >> /home/barbosa/.ssh/authorized_keys
+        chmod 600 /home/barbosa/.ssh/authorized_keys
+        chown barbosa:barbosa /home/barbosa/.ssh/authorized_keys
 
     - name: Criar banner SSH
       copy:
