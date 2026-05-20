@@ -26,7 +26,6 @@ Vagrant.configure("2") do |config|
     arq.vm.hostname = "arq.pedro.barbosa.devops"
     arq.vm.network :private_network, ip: "192.168.56.20"
     
-    # Discos Nativos (SEM customize!)
     (0..2).each do |x|
       arq.vm.disk :disk, size: "10GB", name: "disk-#{x}"
     end
